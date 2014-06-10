@@ -74,8 +74,7 @@ app.directive('ngFileSelect', ['$fileUploader', function($fileUploader) {
             if(!$fileUploader.isHTML5) {
                 element.removeAttr('multiple');
             }
-
-            element.bind('change', function() {
+            element.bind('change', function(event) {
                 var data = $fileUploader.isHTML5 ? this.files : this;
                 var options = scope.$eval(attributes.ngFileSelect);
 
@@ -84,9 +83,57 @@ app.directive('ngFileSelect', ['$fileUploader', function($fileUploader) {
                 if($fileUploader.isHTML5 && element.attr('multiple')) {
                     element.prop('value', null);
                 }
-            });
 
+                loadFileFromInput(event.target, 'dataurl');
+            });
             element.prop('value', null); // FF fix
+
+            // add by peter yun, 2014/6/10
+            // image preview 
+            function loadFileFromInput(input, typeData) {
+                var reader,
+                    fileLoadedEvent,
+                    files = input.files;
+
+                if (files && files[0]) {
+                    reader = new FileReader();
+
+                    reader.onload = function (e) {
+                        fileLoadedEvent = new CustomEvent('fileLoaded', {
+                            detail:{
+                                data:reader.result,
+                                file:files[0]  
+                            },
+                            bubbles:true,
+                            cancelable:true
+                        });
+                        input.dispatchEvent(fileLoadedEvent);
+                    }
+                    switch(typeData) {
+                        case 'arraybuffer':
+                            reader.readAsArrayBuffer(files[0]);
+                            break;
+                        case 'dataurl':
+                            reader.readAsDataURL(files[0]);
+                            break;
+                        case 'binarystring':
+                            reader.readAsBinaryString(files[0]);
+                            break;
+                        case 'text':
+                            reader.readAsText(files[0]);
+                            break;
+                    }
+                }
+            }
+            function fileHandler (e) {
+                var data = e.detail.data,
+                    fileInfo = e.detail.file;
+
+                img.src = data;
+            }
+
+            var img = angular.element(attributes.imageId)[0];
+            element[0].addEventListener('fileLoaded', fileHandler);
         }
     };
 }]);
