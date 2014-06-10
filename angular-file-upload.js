@@ -1,6 +1,115 @@
 /*
  angular-file-upload v0.5.7
  https://github.com/nervgh/angular-file-upload
+
+  <<Example>>
+  -- html
+  <a href="" onclick="$('#file-upload').trigger('click');">
+    <img src="http://placehold.it/50x50" id="file-image" class="img-circle manage-gorup-create-popup-group-image" tooltip-placement="top" tooltip="Change group image">
+  </a>
+  <input type="file" id="file-upload" ng-file-select image-id="#file-image" class="offscreen"/>
+
+  -- js : service 
+  'use strict';
+angular.module('studyGpsApp')
+  .service('ImageUploadService', function ($rootScope, $log, $q, $fileUploader) {
+
+    var uploader = null; 
+
+    this.initUploader = function(options) {
+        // create uploader 
+        uploader = $fileUploader.create(angular.extend({
+            alias: 'photo',
+          method: 'PUT',
+          headers: {
+            'Authorization': 'Bearer ' + $rootScope.sessionInfo.token
+          },
+          formData: [
+            { 'userId': $rootScope.sessionInfo.user.email }
+          ],
+          filters: [
+            function (item) { return true; }
+          ]
+        }, options));
+
+        // set filter 
+        uploader.filters.push(function (item) { // second user filter
+          $log.debug('filter. item is ', item.name);
+          var names = item.name.split('.');
+          var ext = names[names.length-1];
+          if(ext === 'png' || ext === 'jpg' || ext === 'jpeg' || ext === 'gif') {
+            return true;
+          } else {
+            return false;
+          }
+        });
+        return uploader;
+      };  
+
+    this.uploadFile = function (options) {
+        // only one image 
+      if(uploader.queue && uploader.queue[0]) {
+        uploader.queue[0].upload(options);
+      }
+
+      var deferred = $q.defer();
+        uploader.bind('success', function (event, xhr, item, response) {
+          $log.debug('Success', xhr, item, response);
+          deffered.resolve(xhr.response);
+        });
+
+        uploader.bind('error', function (event, xhr, item, response) {
+          $log.error('Error', xhr, item, response);
+          deferred.reject(xhr.response);
+        });
+
+        return deferred.promise;
+    };
+
+  });
+
+  -- js : controller 
+  'use strict';
+
+angular.module('studyGpsApp')
+  .controller('GroupCreateModalController', function ($scope, $rootScope, $modalInstance, GroupCreateModalService, sgAlert, ImageUploadService) {
+
+    $scope.group = {};
+    
+    $scope.createGroup = function () {
+        GroupCreateModalService.createGroup($scope.group).then(function(response){
+          uploadFile(response.data.id);
+          $modalInstance.close();
+        }, function(error){
+          sgAlert.error('Creating Group Failed', error);
+        });
+    };
+
+    $scope.cancel = function () {
+      $modalInstance.dismiss('cancel');
+    };
+
+    // init uploader 
+    ImageUploadService.initUploader({
+      scope: $scope
+    }).bind('whenaddingfilefailed', function (event, item) {
+      sgAlert.warning('Please Select the right file (.png/jpg/jpeg/gif only)');
+    });
+
+    // upload image 
+    function uploadFile(groupId) {
+      ImageUploadService.uploadFile({
+        url: '/api/v1/groups/' + groupId + '/photo',
+      }).then(
+        function(response){
+          sgAlert.success('Create Group Success');
+        }, function(error) {
+          sgAlert.error('Can not upload image', error);
+        }
+      );
+    }
+
+  });
 */
 (function(angular, factory) {
     if (typeof define === 'function' && define.amd) {
